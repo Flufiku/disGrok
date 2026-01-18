@@ -1,2 +1,3 @@
 discord.py
 openrouter
+python-dotenv
