@@ -6,7 +6,7 @@ import os
 load_dotenv()
 
 openrouter_client = OpenRouter(
-    api_key=os.getenv("OPENROUTER_API_KEY"),
+    api_key=os.getenv("HACKCLUB_AI_API_KEY"),
     server_url="https://ai.hackclub.com/proxy/v1",
 )
 
@@ -40,8 +40,9 @@ async def on_message(message):
             ]
         )
         
-        await message.channel.send(response.choices[0].message.content)
+        await message.channel.send(response.choices[0].message.content[0:2000])
         return
+    
 
 
 if __name__ == '__main__':
