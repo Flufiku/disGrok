@@ -30,9 +30,11 @@ async def on_message(message):
     if message.author == client.user:
         return
 
-    if message.content.startswith("$test"):
+    
+
+    if message.content.startswith(f"<@{client.user.id}>"):
         
-        content = message.content.split("$test ",1)[1]
+        content = message.content.split(f"<@{client.user.id}> ",1)[1]
         response = openrouter_client.chat.send(
             model="qwen/qwen3-32b",
             messages=[
@@ -42,7 +44,7 @@ async def on_message(message):
         
         await message.channel.send(response.choices[0].message.content[0:2000])
         return
-    
+
 
 
 if __name__ == '__main__':
