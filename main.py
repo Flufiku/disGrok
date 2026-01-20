@@ -2,6 +2,7 @@ import discord
 from openrouter import OpenRouter
 from dotenv import load_dotenv
 import os
+from helpers import split_send
 
 load_dotenv()
 
@@ -9,8 +10,6 @@ openrouter_client = OpenRouter(
     api_key=os.getenv("HACKCLUB_AI_API_KEY"),
     server_url="https://ai.hackclub.com/proxy/v1",
 )
-
-
 
 
 
@@ -31,10 +30,11 @@ async def on_message(message):
         return
 
     
-
+    
     if message.content.startswith(f"<@{client.user.id}>"):
         
-        content = message.content.split(f"<@{client.user.id}> ",1)[1]
+        content = message.content.split(f"<@{client.user.id}>",1)[1]
+        
         response = openrouter_client.chat.send(
             model="qwen/qwen3-32b",
             messages=[
@@ -42,10 +42,9 @@ async def on_message(message):
             ]
         )
         
-        await message.channel.send(response.choices[0].message.content[0:2000])
+        await split_send(message.channel, response.choices[0].message.content)
         return
-
-
-
+    
+    
 if __name__ == '__main__':
     client.run(os.getenv("DISCORD_BOT_TOKEN"))
