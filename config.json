@@ -1,0 +1,5 @@
+{
+  "server_url": "https://ai.hackclub.com/proxy/v1",
+  "model": "qwen/qwen3-32b",
+  "system_prompt": null
+}

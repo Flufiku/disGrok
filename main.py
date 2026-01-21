@@ -2,13 +2,19 @@ import discord
 from openrouter import OpenRouter
 from dotenv import load_dotenv
 import os
+import json
 from helpers import split_send
 
 load_dotenv()
 
+
+with open("config.json", "r") as f:
+    config = json.load(f)
+
+
 openrouter_client = OpenRouter(
     api_key=os.getenv("HACKCLUB_AI_API_KEY"),
-    server_url="https://ai.hackclub.com/proxy/v1",
+    server_url=config["server_url"],
 )
 
 
@@ -30,16 +36,18 @@ async def on_message(message):
         return
 
     
-    
     if message.content.startswith(f"<@{client.user.id}>"):
         
         content = message.content.split(f"<@{client.user.id}>",1)[1]
         
+        messages = []
+        if config.get("system_prompt"):
+            messages.append({"role": "system", "content": config["system_prompt"]})
+        messages.append({"role": "user", "content": content})
+        
         response = openrouter_client.chat.send(
-            model="qwen/qwen3-32b",
-            messages=[
-                {"role": "user", "content": content}
-            ]
+            model=config["model"],
+            messages=messages
         )
         
         await split_send(message.channel, response.choices[0].message.content)
