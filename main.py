@@ -34,7 +34,6 @@ async def on_ready():
 async def on_message(message):
     if message.author == client.user:
         return
-
     
     if message.content.startswith(f"<@{client.user.id}>"):
         
