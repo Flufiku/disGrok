@@ -3,7 +3,7 @@ from openrouter import OpenRouter
 from dotenv import load_dotenv
 import os
 import json
-from helpers import split_send
+from helpers import split_send, fetch_context_messages
 
 load_dotenv()
 
@@ -37,12 +37,23 @@ async def on_message(message):
     
     if message.content.startswith(f"<@{client.user.id}>"):
         
-        content = message.content.split(f"<@{client.user.id}>",1)[1]
+        content = message.content.split(f"<@{client.user.id}>",1)[1].strip()
+        
+        
+        msg_context_length = config.get("msg_context_length", 5)
+        context = await fetch_context_messages(message.channel, msg_context_length, message.id)
+        
         
         messages = []
         if config.get("system_prompt"):
             messages.append({"role": "system", "content": config["system_prompt"]})
-        messages.append({"role": "user", "content": content})
+        
+        
+        user_content = content
+        if context:
+            user_content = f"Previous context:\n{context}\n\nUser message:\n{message.author.name}:{content}"
+        
+        messages.append({"role": "user", "content": user_content})
         
         response = openrouter_client.chat.send(
             model=config["model"],

@@ -1,5 +1,6 @@
 {
   "server_url": "https://ai.hackclub.com/proxy/v1",
   "model": "qwen/qwen3-32b",
-  "system_prompt": null
+  "system_prompt": "You are a helpful discord bot that provides concise and accurate information.",
+  "msg_context_length": 5
 }

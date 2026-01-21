@@ -18,3 +18,20 @@ async def split_send(channel, message):
     for msg in messages:
         if msg:
             await channel.send(msg)
+
+
+
+
+async def fetch_context_messages(channel, msg_context_length, exclude_message_id):
+    context_messages = []
+    
+    async for msg in channel.history(limit=msg_context_length + 1):
+        if msg.id != exclude_message_id:
+            context_messages.insert(0, msg)
+    
+    # Build context string from messages
+    context = ""
+    for msg in context_messages:
+        context += f"{msg.author.name}: {msg.content}\n"
+    
+    return context
