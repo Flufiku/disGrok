@@ -59,7 +59,7 @@ async def on_message(message):
             model=config["model"],
             messages=messages
         )
-        
+
         await split_send(message.channel, response.choices[0].message.content)
         return
     
