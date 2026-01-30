@@ -3,8 +3,9 @@ from openrouter import OpenRouter
 from dotenv import load_dotenv
 import os
 import json
-from helpers import split_send, fetch_context_messages
 
+
+from helpers import *
 load_dotenv()
 
 
@@ -37,30 +38,73 @@ async def on_message(message):
     
     if message.content.startswith(f"<@{client.user.id}>"):
         
-        content = message.content.split(f"<@{client.user.id}>",1)[1].strip()
         
+        
+        content = message.content.split(f"<@{client.user.id}>",1)[1].strip()
         
         msg_context_length = config.get("msg_context_length", 5)
         context = await fetch_context_messages(message.channel, msg_context_length, message.id)
         
-        
-        messages = []
-        if config.get("system_prompt"):
-            messages.append({"role": "system", "content": config["system_prompt"]})
-        
-        
-        user_content = content
         if context:
-            user_content = f"Previous context:\n{context}\n\nUser message:\n{message.author.name}:{content}"
-        
-        messages.append({"role": "user", "content": user_content})
-        
-        response = openrouter_client.chat.send(
-            model=config["model"],
-            messages=messages
-        )
+            user_content = f"Previous context in chronological order (newest last):\n{context}\n\nUser message:\n{message.author.name}:{content}"
+        else:
+            user_content = f"User message:\n{message.author.name}:{content}"
 
-        await split_send(message.channel, response.choices[0].message.content)
+
+
+        main_messages = []
+        
+        if config.get("main_system_prompt"):
+            main_messages.append({"role": "system", "content": config["main_system_prompt"]})
+                    
+        main_messages.append({"role": "user", "content": user_content})
+        
+        
+        
+        web_messages = []
+        
+        if config.get("web_system_prompt"):
+            web_messages.append({"role": "system", "content": config["web_system_prompt"]})
+            
+        web_messages.append({"role": "user", "content": user_content})
+        
+        
+        
+        web_response = openrouter_client.chat.send(
+            model=config["web_model"],
+            messages=web_messages
+        )
+        
+        web_response_content = web_response.choices[0].message.content
+        search_query, news_query = get_search_queries(web_response_content)
+        
+        all_search_results = ""
+        if search_query:
+            search_results = get_search_results(os.getenv("HACKCLUB_SEARCH_API_KEY"), search_query, num_results=5)
+            if search_results != []:
+                all_search_results += "General Search Results:\n"
+                for idx, res in enumerate(search_results):
+                    all_search_results += f"{idx+1}. {res}\n"
+        
+        if news_query:
+            news_results = get_news_results(os.getenv("HACKCLUB_SEARCH_API_KEY"), news_query, num_results=5)
+            if news_results != []:
+                all_search_results += "\nNews Search Results:\n"
+                for idx, res in enumerate(news_results):
+                    all_search_results += f"{idx+1}. {res}\n"
+        
+        if all_search_results:
+            main_messages.append({"role": "user", "content": f"Web Search Results:\n{all_search_results}"})
+            
+            
+            
+        main_response = openrouter_client.chat.send(
+            model=config["main_model"],
+            messages=main_messages
+        )
+        
+
+        await split_send(message.channel, main_response.choices[0].message.content)
         return
     
     
