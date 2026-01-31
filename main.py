@@ -67,7 +67,7 @@ async def on_message(message):
             web_messages.append({"role": "system", "content": config["web_system_prompt"]})
             
         web_messages.append({"role": "user", "content": user_content})
-        
+
         
         
         web_response = openrouter_client.chat.send(
@@ -76,7 +76,7 @@ async def on_message(message):
         )
         
         web_response_content = web_response.choices[0].message.content
-        search_query, news_query = get_search_queries(web_response_content)
+        search_query, news_query, image_query = get_search_queries(web_response_content)
         
         all_search_results = ""
         if search_query:
@@ -92,19 +92,29 @@ async def on_message(message):
                 all_search_results += "\nNews Search Results:\n"
                 for idx, res in enumerate(news_results):
                     all_search_results += f"{idx+1}. {res}\n"
+    
+        image_results = []
+        if image_query:
+            image_results = get_image_results(os.getenv("HACKCLUB_SEARCH_API_KEY"), image_query, num_results=1)
         
         if all_search_results:
             main_messages.append({"role": "user", "content": f"Web Search Results:\n{all_search_results}"})
             
-            
+        
             
         main_response = openrouter_client.chat.send(
             model=config["main_model"],
             messages=main_messages
         )
-        
 
-        await split_send(message.channel, main_response.choices[0].message.content)
+        main_response_content = main_response.choices[0].message.content
+        if image_results != []:
+            main_response_content += "\n\n"
+            for idx, img_url in enumerate(image_results):
+                main_response_content += f"{img_url}\n"
+
+
+        await split_send(message.channel, main_response_content)
         return
     
     

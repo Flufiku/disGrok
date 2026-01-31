@@ -54,8 +54,12 @@ def get_search_queries(web_response):
             news_query = line.replace("News Query:", "").strip()
             if news_query.lower() == "none":
                 news_query = ""
+        elif line.startswith("Image Query:"):
+            image_query = line.replace("Image Query:", "").strip()
+            if image_query.lower() == "none":
+                image_query = ""
     
-    return general_query, news_query
+    return general_query, news_query, image_query
 
 
 
@@ -112,3 +116,29 @@ def get_news_results(api_key, query, num_results=5, safesearch='off'):
     except Exception as e:
         print(f"Error fetching news results: {e}")
         return [] 
+    
+    
+def get_image_results(api_key, query, num_results=1, safesearch='off'):
+    if not query:
+        return []
+    
+    try:
+        response = requests.get(
+            'https://search.hackclub.com/res/v1/images/search',
+            params={'q': query, 'count': num_results, 'safesearch': safesearch},
+            headers={'Authorization': f'Bearer {api_key}'}
+        )
+        response.raise_for_status()
+        data = response.json()
+        
+        results = []
+        if 'results' in data:
+            for result in data['results']:
+                image_url = result.get('properties', {}).get('url', '')
+                if image_url:
+                    results.append(image_url)
+        
+        return results
+    except Exception as e:
+        print(f"Error fetching image results: {e}")
+        return []
