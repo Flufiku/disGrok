@@ -37,20 +37,30 @@ async def on_message(message):
         return
     
     if message.content.startswith(f"<@{client.user.id}>"):
-        
-        
+
         
         content = message.content.split(f"<@{client.user.id}>",1)[1].strip()
         
         msg_context_length = config.get("msg_context_length", 5)
         context = await fetch_context_messages(message.channel, msg_context_length, message.id)
         
+        user_content = ""
         if context:
-            user_content = f"Previous context in chronological order (newest last):\n{context}\n\nUser message:\n{message.author.name}:{content}"
-        else:
-            user_content = f"User message:\n{message.author.name}:{content}"
+            user_content = f"Previous context in chronological order (newest last):\n{context}\n\n"
+        
+        user_content += f"User message:\n{message.author.name}:{content}\n\n"
 
-
+        if message.reference and message.reference.message_id:
+            try:
+                replied = message.reference.resolved
+                if replied is None:
+                    replied = await message.fetch_reference()
+                    
+                user_content += f"Replied to message:\n{replied.author.name}:{replied.content}\n\n"
+            
+            except discord.NotFound:
+                pass
+        
 
         main_messages = []
         
