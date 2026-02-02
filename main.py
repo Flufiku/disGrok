@@ -3,6 +3,7 @@ from openrouter import OpenRouter
 from dotenv import load_dotenv
 import os
 import json
+import asyncio
 
 
 from helpers import *
@@ -17,7 +18,6 @@ openrouter_client = OpenRouter(
     api_key=os.getenv("HACKCLUB_AI_API_KEY"),
     server_url=config["server_url"],
 )
-
 
 
 
@@ -37,7 +37,6 @@ async def on_message(message):
         return
     
     if message.content.startswith(f"<@{client.user.id}>"):
-
         
         content = message.content.split(f"<@{client.user.id}>",1)[1].strip()
         
@@ -79,52 +78,67 @@ async def on_message(message):
         web_messages.append({"role": "user", "content": user_content})
 
         
-        
-        web_response = openrouter_client.chat.send(
-            model=config["web_model"],
-            messages=web_messages
-        )
-        
-        web_response_content = web_response.choices[0].message.content
-        search_query, news_query, image_query = get_search_queries(web_response_content)
-        
-        all_search_results = ""
-        if search_query:
-            search_results = get_search_results(os.getenv("HACKCLUB_SEARCH_API_KEY"), search_query, num_results=5)
-            if search_results != []:
-                all_search_results += "General Search Results:\n"
-                for idx, res in enumerate(search_results):
-                    all_search_results += f"{idx+1}. {res}\n"
-        
-        if news_query:
-            news_results = get_news_results(os.getenv("HACKCLUB_SEARCH_API_KEY"), news_query, num_results=5)
-            if news_results != []:
-                all_search_results += "\nNews Search Results:\n"
-                for idx, res in enumerate(news_results):
-                    all_search_results += f"{idx+1}. {res}\n"
-    
         image_results = []
-        if image_query:
-            image_results = get_image_results(os.getenv("HACKCLUB_SEARCH_API_KEY"), image_query, num_results=1)
-        
-        if all_search_results:
-            main_messages.append({"role": "user", "content": f"Web Search Results:\n{all_search_results}"})
+        try:
+            # Run synchronous API call in executor to avoid blocking event loop
+            loop = asyncio.get_event_loop()
+            web_response = await loop.run_in_executor(
+                None,
+                lambda: openrouter_client.chat.send(
+                    model=config["web_model"],
+                    messages=web_messages
+                )
+            )
             
-        
+            web_response_content = web_response.choices[0].message.content
+            search_query, news_query, image_query = get_search_queries(web_response_content)
             
-        main_response = openrouter_client.chat.send(
-            model=config["main_model"],
-            messages=main_messages
-        )
+            all_search_results = ""
+            if search_query:
+                search_results = get_search_results(os.getenv("HACKCLUB_SEARCH_API_KEY"), search_query, num_results=5)
+                if search_results != []:
+                    all_search_results += "General Search Results:\n"
+                    for idx, res in enumerate(search_results):
+                        all_search_results += f"{idx+1}. {res}\n"
+            
+            if news_query:
+                news_results = get_news_results(os.getenv("HACKCLUB_SEARCH_API_KEY"), news_query, num_results=5)
+                if news_results != []:
+                    all_search_results += "\nNews Search Results:\n"
+                    for idx, res in enumerate(news_results):
+                        all_search_results += f"{idx+1}. {res}\n"
+        
+            if image_query:
+                image_results = get_image_results(os.getenv("HACKCLUB_SEARCH_API_KEY"), image_query, num_results=1)
+            
+            if all_search_results:
+                main_messages.append({"role": "user", "content": f"Web Search Results:\n{all_search_results}"})
+        except Exception as e:
+            print(f"Error during web search: {e}")
+        
+        try:
+            # Run synchronous API call in executor to avoid blocking event loop
+            loop = asyncio.get_event_loop()
+            main_response = await loop.run_in_executor(
+                None,
+                lambda: openrouter_client.chat.send(
+                    model=config["main_model"],
+                    messages=main_messages
+                )
+            )
 
-        main_response_content = main_response.choices[0].message.content
-        if image_results != []:
-            main_response_content += "\n\n"
-            for idx, img_url in enumerate(image_results):
-                main_response_content += f"{img_url}\n"
+            main_response_content = main_response.choices[0].message.content
+            if image_results != []:
+                main_response_content += "\n\n"
+                for idx, img_url in enumerate(image_results):
+                    main_response_content += f"{img_url}\n"
 
 
-        await split_send(message.channel, main_response_content)
+            await split_send(message.channel, main_response_content)
+        except Exception as e:
+            print(f"Error during main response generation: {e}")
+            
+            await split_send(message.channel, ":x: Sorry, I encountered an error while trying to process your request. Please try again later.")
         return
     
     
