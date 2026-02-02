@@ -142,3 +142,44 @@ def get_image_results(api_key, query, num_results=1, safesearch='off'):
     except Exception as e:
         print(f"Error fetching image results: {e}")
         return []
+
+
+def make_user_message(text):
+    return {
+        "type": "message",
+        "role": "user",
+        "content": [
+            {
+                "type": "input_text",
+                "text": text,
+            }
+        ],
+    }
+
+
+def parse_response_text(data):
+    output = data.get("output", [])
+    for item in output:
+        if item.get("type") == "message" and item.get("role") == "assistant":
+            content_items = item.get("content", [])
+            texts = []
+            for content in content_items:
+                if content.get("type") == "output_text":
+                    texts.append(content.get("text", ""))
+            if texts:
+                return "".join(texts)
+    return ""
+
+
+def send_responses_request(responses_url, api_key, model, messages):
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+    }
+    payload = {
+        "model": model,
+        "input": messages,
+    }
+    response = requests.post(responses_url, headers=headers, json=payload, timeout=60)
+    response.raise_for_status()
+    return response.json()
