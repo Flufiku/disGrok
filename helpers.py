@@ -144,16 +144,54 @@ def get_image_results(api_key, query, num_results=1, safesearch='off'):
         return []
 
 
-def make_user_message(text):
+def make_user_message(text, image_urls=None):
+    content = [
+        {
+            "type": "input_text",
+            "text": text,
+        }
+    ]
+
+    if image_urls:
+        for url in image_urls:
+            content.append(
+                {
+                    "type": "image_url",
+                    "image_url": {
+                        "url": url,
+                    },
+                }
+            )
+
     return {
         "type": "message",
         "role": "user",
-        "content": [
-            {
-                "type": "input_text",
-                "text": text,
-            }
-        ],
+        "content": content,
+    }
+
+
+def make_chat_message(role, text, image_urls=None):
+    content = [
+        {
+            "type": "text",
+            "text": text,
+        }
+    ]
+
+    if image_urls:
+        for url in image_urls:
+            content.append(
+                {
+                    "type": "image_url",
+                    "image_url": {
+                        "url": url,
+                    },
+                }
+            )
+
+    return {
+        "role": role,
+        "content": content,
     }
 
 
@@ -171,6 +209,27 @@ def parse_response_text(data):
     return ""
 
 
+def parse_chat_completions_text(data):
+    choices = data.get("choices", [])
+    if not choices:
+        return ""
+
+    message = choices[0].get("message", {})
+    content = message.get("content", "")
+
+    if isinstance(content, str):
+        return content
+
+    if isinstance(content, list):
+        texts = []
+        for item in content:
+            if item.get("type") == "text":
+                texts.append(item.get("text", ""))
+        return "".join(texts)
+
+    return ""
+
+
 def send_responses_request(responses_url, api_key, model, messages):
     headers = {
         "Authorization": f"Bearer {api_key}",
@@ -183,3 +242,41 @@ def send_responses_request(responses_url, api_key, model, messages):
     response = requests.post(responses_url, headers=headers, json=payload, timeout=60)
     response.raise_for_status()
     return response.json()
+
+
+def send_chat_completions_request(chat_url, api_key, model, messages):
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+    }
+    payload = {
+        "model": model,
+        "messages": messages,
+    }
+    response = requests.post(chat_url, headers=headers, json=payload, timeout=60)
+    response.raise_for_status()
+    return response.json()
+
+
+
+def get_image_urls_from_message(msg):
+    if not msg:
+        return []
+
+    urls = []
+    for attachment in msg.attachments:
+        url = attachment.url
+        if not url:
+            continue
+
+        content_type = (attachment.content_type or "").lower()
+        filename = (attachment.filename or "").lower()
+
+        is_image = content_type.startswith("image/") or filename.endswith(
+            (".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".tiff", ".tif")
+        )
+
+        if is_image:
+            urls.append(url)
+
+    return urls

@@ -12,6 +12,7 @@ with open("config.json", "r") as f:
 
 
 RESPONSES_URL = f"{config['server_url'].rstrip('/')}/responses"
+CHAT_COMPLETIONS_URL = f"{config['server_url'].rstrip('/')}/chat/completions"
 
 
 
@@ -43,6 +44,8 @@ async def on_message(message):
         
         user_content += f"User message:\n{message.author.name}:{content}\n\n"
 
+        image_urls = get_image_urls_from_message(message)
+
         if message.reference and message.reference.message_id:
             try:
                 replied = message.reference.resolved
@@ -50,43 +53,65 @@ async def on_message(message):
                     replied = await message.fetch_reference()
                     
                 user_content += f"Replied to message:\n{replied.author.name}:{replied.content}\n\n"
+                image_urls.extend(get_image_urls_from_message(replied))
             
             except discord.NotFound:
                 pass
         
 
+        has_images = len(image_urls) > 0
+
         main_messages = []
-        
-        if config.get("main_system_prompt"):
-            main_messages.append(make_user_message(config["main_system_prompt"]))
-                    
-        main_messages.append(make_user_message(user_content))
+
+        if has_images:
+            if config.get("main_system_prompt"):
+                main_messages.append(make_chat_message("system", config["main_system_prompt"]))
+            main_messages.append(make_chat_message("user", user_content, image_urls=image_urls))
+        else:
+            if config.get("main_system_prompt"):
+                main_messages.append(make_user_message(config["main_system_prompt"]))
+            main_messages.append(make_user_message(user_content))
         
         
                 
         web_messages = []
-        
-        if config.get("web_system_prompt"):
-            web_messages.append(make_user_message(config["web_system_prompt"]))
-            
-        web_messages.append(make_user_message(user_content))
+
+        if has_images:
+            if config.get("web_system_prompt"):
+                web_messages.append(make_chat_message("system", config["web_system_prompt"]))
+            web_messages.append(make_chat_message("user", user_content, image_urls=image_urls))
+        else:
+            if config.get("web_system_prompt"):
+                web_messages.append(make_user_message(config["web_system_prompt"]))
+            web_messages.append(make_user_message(user_content))
 
         
         image_results = []
         try:
             # Run synchronous API call in executor to avoid blocking event loop
             loop = asyncio.get_event_loop()
-            web_response = await loop.run_in_executor(
-                None,
-                lambda: send_responses_request(
-                    RESPONSES_URL,
-                    os.getenv("HACKCLUB_AI_API_KEY"),
-                    config["web_model"],
-                    web_messages,
+            if has_images:
+                web_response = await loop.run_in_executor(
+                    None,
+                    lambda: send_chat_completions_request(
+                        CHAT_COMPLETIONS_URL,
+                        os.getenv("HACKCLUB_AI_API_KEY"),
+                        config["image_web_model"],
+                        web_messages,
+                    )
                 )
-            )
-            
-            web_response_content = parse_response_text(web_response)
+                web_response_content = parse_chat_completions_text(web_response)
+            else:
+                web_response = await loop.run_in_executor(
+                    None,
+                    lambda: send_responses_request(
+                        RESPONSES_URL,
+                        os.getenv("HACKCLUB_AI_API_KEY"),
+                        config["web_model"],
+                        web_messages,
+                    )
+                )
+                web_response_content = parse_response_text(web_response)
             search_query, news_query, image_query = get_search_queries(web_response_content)
             
             all_search_results = ""
@@ -108,24 +133,38 @@ async def on_message(message):
                 image_results = get_image_results(os.getenv("HACKCLUB_SEARCH_API_KEY"), image_query, num_results=1)
             
             if all_search_results:
-                main_messages.append(make_user_message(f"Web Search Results:\n{all_search_results}"))
+                if has_images:
+                    main_messages.append(make_chat_message("user", f"Web Search Results:\n{all_search_results}"))
+                else:
+                    main_messages.append(make_user_message(f"Web Search Results:\n{all_search_results}"))
         except Exception as e:
             print(f"Error during web search: {e}")
         
         try:
             # Run synchronous API call in executor to avoid blocking event loop
             loop = asyncio.get_event_loop()
-            main_response = await loop.run_in_executor(
-                None,
-                lambda: send_responses_request(
-                    RESPONSES_URL,
-                    os.getenv("HACKCLUB_AI_API_KEY"),
-                    config["main_model"],
-                    main_messages,
+            if has_images:
+                main_response = await loop.run_in_executor(
+                    None,
+                    lambda: send_chat_completions_request(
+                        CHAT_COMPLETIONS_URL,
+                        os.getenv("HACKCLUB_AI_API_KEY"),
+                        config["image_main_model"],
+                        main_messages,
+                    )
                 )
-            )
-
-            main_response_content = parse_response_text(main_response)
+                main_response_content = parse_chat_completions_text(main_response)
+            else:
+                main_response = await loop.run_in_executor(
+                    None,
+                    lambda: send_responses_request(
+                        RESPONSES_URL,
+                        os.getenv("HACKCLUB_AI_API_KEY"),
+                        config["main_model"],
+                        main_messages,
+                    )
+                )
+                main_response_content = parse_response_text(main_response)
             if image_results != []:
                 main_response_content += "\n\n"
                 for idx, img_url in enumerate(image_results):
