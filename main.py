@@ -1,9 +1,11 @@
 import discord
+from discord import app_commands
 from dotenv import load_dotenv
 import os
 import json
 import asyncio
 from helpers import *
+from image_commands import setup_image_commands
 load_dotenv()
 
 
@@ -21,9 +23,12 @@ intents = discord.Intents.default()
 intents.message_content = True
 
 client = discord.Client(intents=intents)
+tree = app_commands.CommandTree(client)
+setup_image_commands(tree, config)
 
 @client.event
 async def on_ready():
+    await tree.sync()
     print(f'Logged in as {client.user}')
 
 @client.event
