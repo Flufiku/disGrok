@@ -5,7 +5,8 @@ import os
 import json
 import asyncio
 from helpers import *
-from image_commands import setup_image_commands
+from c_images import setup_image_commands
+from c_audio import setup_audio_commands
 load_dotenv()
 
 
@@ -25,6 +26,7 @@ intents.message_content = True
 client = discord.Client(intents=intents)
 tree = app_commands.CommandTree(client)
 setup_image_commands(tree, config)
+setup_audio_commands(tree, config)
 
 @client.event
 async def on_ready():
