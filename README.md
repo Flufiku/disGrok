@@ -1,10 +1,24 @@
 # disGrok
-A Discord Bot that acts like the Grok Twitter Bot and can answer questions based on recent messages.
-
+A Discord Bot that acts like the Grok Twitter Bot and can answer questions based on recent messages. It can also search the web for information, provide summaries, and send voice messages.
 
 
 
 ## Install Guide
+
+### 0. Create a Discord Bot
+1. Go to the [Discord Developer Portal](https://discord.com/developers/applications) and create a new application.
+2. Navigate to the "Bot" tab and click "Add Bot".
+3. Copy the bot token and save it for later.
+4. Under "OAuth2" > "URL Generator", select these scopes:
+	- `bot`
+	- `applications.commands`
+5. In the same "URL Generator" section, select these Bot Permissions:
+	- View Channels
+	- Send Messages
+	- Read Message History
+6. In the "Bot" tab, enable the **Message Content Intent**.
+7. Copy the generated URL and use it to invite the bot to your Discord server.
+
 
 ### 1. Install PyTorch with CUDA Support
 If you have an NVIDIA GPU with CUDA support:
