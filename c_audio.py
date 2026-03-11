@@ -6,9 +6,9 @@ import tempfile
 
 import discord
 from discord import app_commands
-import soundfile as sf
-import torch
-from qwen_tts import Qwen3TTSModel
+#import soundfile as sf
+#import torch
+#from qwen_tts import Qwen3TTSModel
 
 
 SUPPORTED_VOICES = [
