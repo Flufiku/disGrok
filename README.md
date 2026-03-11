@@ -1,4 +1,8 @@
 # disGrok
+
+**IMPORTANT: This version is made for an online demo on a cheap VPS. Since AI Voice generation runs locally and takes significant resources, it has been disabled in this version.**
+
+
 A Discord Bot that acts like the Grok Twitter Bot and can answer questions based on recent messages. It can also search the web for information, provide summaries, and send voice messages.
 
 

@@ -28,6 +28,7 @@ _tts_model_lock = asyncio.Lock()
 _voice_clone_model = None
 _voice_clone_model_lock = asyncio.Lock()
 _tts_generation_lock = asyncio.Lock()
+VOICE_DISABLED_MESSAGE = "This version is made for an online demo on a cheap VPS. Since AI Voice generation runs locally and takes significant resources, it has been disabled in this version. Sorry."
 
 
 def _resolve_voice(voice):
@@ -161,6 +162,9 @@ def setup_audio_commands(tree, config):
 	@app_commands.describe(voice="Voice to use", prompt="Text to speak")
 	@app_commands.choices(voice=voice_choices)
 	async def tts(interaction: discord.Interaction, voice: str, prompt: str):
+		await interaction.response.send_message(VOICE_DISABLED_MESSAGE, ephemeral=False)
+		return
+
 		await interaction.response.defer(thinking=True)
 
 		resolved_voice = _resolve_voice(voice)
@@ -207,6 +211,9 @@ def setup_audio_commands(tree, config):
 		prompt: str,
 		ref_text: str = None,
 	):
+		await interaction.response.send_message(VOICE_DISABLED_MESSAGE, ephemeral=False)
+		return
+
 		await interaction.response.defer(thinking=True)
 
 		# Validate audio file
