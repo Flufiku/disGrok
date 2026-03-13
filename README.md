@@ -2,6 +2,18 @@
 A Discord Bot that acts like the Grok Twitter Bot and can answer questions based on recent messages. It can also search the web for information, provide summaries, and send voice messages.
 
 
+## How to use the Bot:
+
+Image Generation: 
+* Use the `/gen_image` command and write your prompt into the `Prompt`-Field
+
+Voice Generations: 
+* Use the `/tts` command, choose from the available voices in the `Voice`-Field and write your prompt into the `Prompt`-Field
+* Use the `/voice_clone` command, upload a voice sample in the `audio_sample`-Field and and write your prompt into the `Prompt`-Field
+
+Text Generation:
+* Just @ mention the bot. It will reply to your message.
+
 
 ## Install Guide
 
