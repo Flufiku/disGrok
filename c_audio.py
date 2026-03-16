@@ -1,14 +1,16 @@
 import asyncio
 import io
+import sqlite3
+import time
 import traceback
 from pathlib import Path
 import tempfile
 
 import discord
 from discord import app_commands
-#import soundfile as sf
-#import torch
-#from qwen_tts import Qwen3TTSModel
+import soundfile as sf
+import torch
+from qwen_tts import Qwen3TTSModel
 
 
 SUPPORTED_VOICES = [
@@ -28,7 +30,49 @@ _tts_model_lock = asyncio.Lock()
 _voice_clone_model = None
 _voice_clone_model_lock = asyncio.Lock()
 _tts_generation_lock = asyncio.Lock()
-VOICE_DISABLED_MESSAGE = "This version is made for an online demo on a cheap VPS. Since AI Voice generation runs locally and takes significant resources, it has been disabled in this version. Sorry."
+VOICE_USAGE_DB_PATH = Path(__file__).resolve().parent / "voice_usage.db"
+VOICE_COMMAND_DAILY_LIMIT = 3
+VOICE_COMMAND_WINDOW_SECONDS = 24 * 60 * 60
+
+
+def _init_voice_usage_db():
+	with sqlite3.connect(VOICE_USAGE_DB_PATH) as connection:
+		connection.execute(
+			"""
+			CREATE TABLE IF NOT EXISTS voice_commands (
+				client_id TEXT NOT NULL,
+				time INTEGER NOT NULL
+			)
+			"""
+		)
+
+
+def _count_voice_commands_in_window(client_id, since_unix):
+	with sqlite3.connect(VOICE_USAGE_DB_PATH) as connection:
+		cursor = connection.execute(
+			"SELECT COUNT(*) FROM voice_commands WHERE client_id = ? AND time >= ?",
+			(str(client_id), int(since_unix)),
+		)
+		row = cursor.fetchone()
+		return int(row[0]) if row else 0
+
+
+def _log_voice_command(client_id, unix_time):
+	with sqlite3.connect(VOICE_USAGE_DB_PATH) as connection:
+		connection.execute(
+			"INSERT INTO voice_commands (client_id, time) VALUES (?, ?)",
+			(str(client_id), int(unix_time)),
+		)
+		connection.commit()
+
+
+def _is_voice_command_limited_and_log(client_id):
+	now_unix = int(time.time())
+	window_start = now_unix - VOICE_COMMAND_WINDOW_SECONDS
+	commands_in_window = _count_voice_commands_in_window(client_id, window_start)
+	is_limited = commands_in_window >= VOICE_COMMAND_DAILY_LIMIT
+	_log_voice_command(client_id, now_unix)
+	return is_limited
 
 
 def _resolve_voice(voice):
@@ -146,6 +190,8 @@ def _synthesize_voice_clone(model, text, ref_audio_path, ref_text=None, language
 
 
 def setup_audio_commands(tree, config):
+	_init_voice_usage_db()
+
 	voice_choices = [
 		app_commands.Choice(name="Vivian", value="Vivian"),
 		app_commands.Choice(name="Serena", value="Serena"),
@@ -162,8 +208,20 @@ def setup_audio_commands(tree, config):
 	@app_commands.describe(voice="Voice to use", prompt="Text to speak")
 	@app_commands.choices(voice=voice_choices)
 	async def tts(interaction: discord.Interaction, voice: str, prompt: str):
-		await interaction.response.send_message(VOICE_DISABLED_MESSAGE, ephemeral=False)
-		return
+		if _is_voice_command_limited_and_log(interaction.user.id):
+			await interaction.response.send_message(
+				":x: Sorry, you can only use 3 voice commands per 24 hours. Please try again later.",
+				ephemeral=True,
+			)
+			return
+
+		trimmed_prompt = (prompt or "")[:140]
+		if not trimmed_prompt.strip():
+			await interaction.response.send_message(
+				":x: Please provide text to speak.",
+				ephemeral=True,
+			)
+			return
 
 		await interaction.response.defer(thinking=True)
 
@@ -182,7 +240,7 @@ def setup_audio_commands(tree, config):
 			async with _tts_generation_lock:
 				audio_buffer = await loop.run_in_executor(
 					None,
-					lambda: _synthesize_wav(model, prompt, resolved_voice),
+					lambda: _synthesize_wav(model, trimmed_prompt, resolved_voice),
 				)
 
 			audio_file = discord.File(audio_buffer, filename=f"tts_{resolved_voice}.wav")
@@ -211,8 +269,20 @@ def setup_audio_commands(tree, config):
 		prompt: str,
 		ref_text: str = None,
 	):
-		await interaction.response.send_message(VOICE_DISABLED_MESSAGE, ephemeral=False)
-		return
+		if _is_voice_command_limited_and_log(interaction.user.id):
+			await interaction.response.send_message(
+				":x: Sorry, you can only use 3 voice commands per 24 hours. Please try again later.",
+				ephemeral=True,
+			)
+			return
+
+		trimmed_prompt = (prompt or "")[:140]
+		if not trimmed_prompt.strip():
+			await interaction.response.send_message(
+				":x: Please provide text to speak.",
+				ephemeral=True,
+			)
+			return
 
 		await interaction.response.defer(thinking=True)
 
@@ -239,7 +309,7 @@ def setup_audio_commands(tree, config):
 						None,
 						lambda: _synthesize_voice_clone(
 							model,
-							prompt,
+							trimmed_prompt,
 							temp_audio_path,
 							ref_text=ref_text,
 							language="Auto",
